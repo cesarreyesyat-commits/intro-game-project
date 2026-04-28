@@ -1,114 +1,98 @@
-import turtle
+import tkinter as tk
 
-# Window setup
-win = turtle.Screen()
-win.title("Pong by VS Code")
-win.bgcolor("black")
-win.setup(width=800, height=600)
-win.tracer(0) # Stops window from updating automatically (speeds up game)
+class PongGame:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Pong - Tkinter Edition")
+        self.root.resizable(False, False)
 
-# Score
-score_a = 0
-score_b = 0
+        # Game constants
+        self.canvas_width = 800
+        self.canvas_height = 600
+        self.paddle_width = 15
+        self.paddle_height = 100
+        self.ball_size = 15
+        
+        # Setup Canvas
+        self.canvas = tk.Canvas(self.root, width=self.canvas_width, height=self.canvas_height, bg="#222", highlightthickness=0)
+        self.canvas.pack()
 
-# Paddle A
-paddle_a = turtle.Turtle()
-paddle_a.speed(0)
-paddle_a.shape("square")
-paddle_a.color("white")
-paddle_a.shapesize(stretch_wid=5, stretch_len=1)
-paddle_a.penup()
-paddle_a.goto(-350, 0)
+        # Dashed line
+        self.canvas.create_line(400, 0, 400, 600, fill="white", dash=(10, 10))
 
-# Paddle B
-paddle_b = turtle.Turtle()
-paddle_b.speed(0)
-paddle_b.shape("square")
-paddle_b.color("white")
-paddle_b.shapesize(stretch_wid=5, stretch_len=1)
-paddle_b.penup()
-paddle_b.goto(350, 0)
+        # Paddles and Ball
+        self.left_paddle = self.canvas.create_rectangle(20, 250, 20 + self.paddle_width, 350, fill="cyan")
+        self.right_paddle = self.canvas.create_rectangle(765, 250, 765 + self.paddle_width, 350, fill="magenta")
+        self.ball = self.canvas.create_oval(392, 292, 392 + self.ball_size, 292 + self.ball_size, fill="white")
 
-# Ball
-ball = turtle.Turtle()
-ball.speed(0)
-ball.shape("square")
-ball.color("white")
-ball.penup()
-ball.goto(0, 0)
-ball.dx = 0.2  # Ball speed X
-ball.dy = 0.2  # Ball speed Y
+        # Scores
+        self.score_a = 0
+        self.score_b = 0
+        self.score_display = self.canvas.create_text(400, 50, text="0   0", fill="white", font=("Courier", 40, "bold"))
 
-# Scoreboard
-pen = turtle.Turtle()
-pen.speed(0)
-pen.color("white")
-pen.penup()
-pen.hideturtle()
-pen.goto(0, 260)
-pen.write("Player A: 0  Player B: 0", align="center", font=("Courier", 24, "normal"))
+        # Movement variables
+        self.ball_dx = 4
+        self.ball_dy = 4
+        self.pressed_keys = set()
 
-# Movement Functions
-def paddle_a_up():
-    y = paddle_a.ycor()
-    if y < 250: paddle_a.sety(y + 20)
+        # Key bindings
+        self.root.bind("<KeyPress>", lambda e: self.pressed_keys.add(e.keysym))
+        self.root.bind("<KeyRelease>", lambda e: self.pressed_keys.discard(e.keysym))
 
-def paddle_a_down():
-    y = paddle_a.ycor()
-    if y > -240: paddle_a.sety(y - 20)
+        self.update()
+        self.root.mainloop()
 
-def paddle_b_up():
-    y = paddle_b.ycor()
-    if y < 250: paddle_b.sety(y + 20)
+    def move_paddles(self):
+        # Player A (W/S)
+        if "w" in self.pressed_keys and self.canvas.coords(self.left_paddle)[1] > 0:
+            self.canvas.move(self.left_paddle, 0, -6)
+        if "s" in self.pressed_keys and self.canvas.coords(self.left_paddle)[3] < self.canvas_height:
+            self.canvas.move(self.left_paddle, 0, 6)
+        
+        # Player B (Arrows)
+        if "Up" in self.pressed_keys and self.canvas.coords(self.right_paddle)[1] > 0:
+            self.canvas.move(self.right_paddle, 0, -6)
+        if "Down" in self.pressed_keys and self.canvas.coords(self.right_paddle)[3] < self.canvas_height:
+            self.canvas.move(self.right_paddle, 0, 6)
 
-def paddle_b_down():
-    y = paddle_b.ycor()
-    if y > -240: paddle_b.sety(y - 20)
+    def update(self):
+        self.move_paddles()
+        self.canvas.move(self.ball, self.ball_dx, self.ball_dy)
+        
+        ball_pos = self.canvas.coords(self.ball)
 
-# Keyboard bindings
-win.listen()
-win.onkeypress(paddle_a_up, "w")
-win.onkeypress(paddle_a_down, "s")
-win.onkeypress(paddle_b_up, "Up")
-win.onkeypress(paddle_b_down, "Down")
+        # Wall collisions (Top/Bottom)
+        if ball_pos[1] <= 0 or ball_pos[3] >= self.canvas_height:
+            self.ball_dy *= -1
 
-# Main game loop
-while True:
-    win.update()
+        # Paddle collisions
+        if self.ball_dx < 0: # Moving Left
+            if self.is_collision(self.ball, self.left_paddle):
+                self.ball_dx *= -1.05 # Speed up
+        else: # Moving Right
+            if self.is_collision(self.ball, self.right_paddle):
+                self.ball_dx *= -1.05
 
-    # Move the ball
-    ball.setx(ball.xcor() + ball.dx)
-    ball.sety(ball.ycor() + ball.dy)
+        # Scoring
+        if ball_pos[0] <= 0:
+            self.reset_ball("B")
+        elif ball_pos[2] >= self.canvas_width:
+            self.reset_ball("A")
 
-    # Top and Bottom Borders
-    if ball.ycor() > 290:
-        ball.sety(290)
-        ball.dy *= -1
+        self.root.after(10, self.update)
 
-    if ball.ycor() < -290:
-        ball.sety(-290)
-        ball.dy *= -1
+    def is_collision(self, ball, paddle):
+        b = self.canvas.coords(ball)
+        p = self.canvas.coords(paddle)
+        return b[2] >= p[0] and b[0] <= p[2] and b[3] >= p[1] and b[1] <= p[3]
 
-    # Left and Right Borders (Scoring)
-    if ball.xcor() > 390:
-        ball.goto(0, 0)
-        ball.dx *= -1
-        score_a += 1
-        pen.clear()
-        pen.write(f"Player A: {score_a}  Player B: {score_b}", align="center", font=("Courier", 24, "normal"))
+    def reset_ball(self, winner):
+        if winner == "A": self.score_a += 1
+        else: self.score_b += 1
+        
+        self.canvas.itemconfig(self.score_display, text=f"{self.score_a}   {self.score_b}")
+        self.canvas.coords(self.ball, 392, 292, 392 + self.ball_size, 292 + self.ball_size)
+        self.ball_dx = 4 if winner == "B" else -4 # Serve to winner
 
-    if ball.xcor() < -390:
-        ball.goto(0, 0)
-        ball.dx *= -1
-        score_b += 1
-        pen.clear()
-        pen.write(f"Player A: {score_a}  Player B: {score_b}", align="center", font=("Courier", 24, "normal"))
-
-    # Paddle Collisions
-    if (ball.xcor() > 340 and ball.xcor() < 350) and (ball.ycor() < paddle_b.ycor() + 50 and ball.ycor() > paddle_b.ycor() - 50):
-        ball.setx(340)
-        ball.dx *= -1
-
-    if (ball.xcor() < -340 and ball.xcor() > -350) and (ball.ycor() < paddle_a.ycor() + 50 and ball.ycor() > paddle_a.ycor() - 50):
-        ball.setx(-340)
-        ball.dx *= -1
+if __name__ == "__main__":
+    PongGame()
